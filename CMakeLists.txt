@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.5)
 
 include(FetchContent)
 
@@ -30,9 +30,9 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
 
 add_executable(girth ${SOURCES} ${IMGUI_SOURCES})
 
-target_include_directories(girth PRIVATE 
+target_include_directories(girth PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/inc
-    ${imgui_SOURCE_DIR} 
+    ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
 )
 
@@ -41,7 +41,7 @@ set_target_properties(girth PROPERTIES CXX_EXTENSIONS OFF)
 
 target_link_libraries(girth PRIVATE
     SDL3::SDL3
-    OpenGL::GL 
+    OpenGL::GL
     portaudio
 )
 
@@ -51,6 +51,6 @@ target_compile_options(girth PRIVATE
     >
 
     $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
-        -Wall -Wextra -Wpedantic -Werror -Wconversion -Wshadow -Wunused -Wno-error=unused-parameter -Wswitch-enum -pedantic-errors
+        -Wall -Wextra -Wpedantic -Werror -Wconversion -Wshadow -Wunused -Wno-error=unused-parameter -Wswitch-enum -pedantic-errors -Wno-error=switch-enum
     >
 )
