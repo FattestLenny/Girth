@@ -43,6 +43,72 @@ static int paCallback(const void *inputBuffer, void *outputBuffer,
     return paContinue;
 }
 
+void ToolbarFileOpen() {
+}
+void ToolbarFileSave() {
+}
+void ToolbarFileSaveAs() {
+}
+
+void ToolbarFileClose() {
+    // TODO: Change this to exit to welcome menu, dashboard or something
+    std::exit(0);
+}
+
+void ToolbarFileExit() {
+    std::exit(0);
+}
+
+void ToolbarHelpAbout() {
+    std::println("Girth version none");
+}
+
+void DrawMainWindow() {
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+
+    ImGui::Begin("Main", NULL,
+                 ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoTitleBar |
+                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+    if (ImGui::BeginMenuBar()) {
+
+        if (ImGui::BeginMenu("File")) {
+            if (ImGui::MenuItem("Open..."))
+                ToolbarFileOpen();
+            if (ImGui::MenuItem("Save"))
+                ToolbarFileSave();
+            if (ImGui::MenuItem("Save as..."))
+                ToolbarFileSaveAs();
+            if (ImGui::MenuItem("Close"))
+                ToolbarFileClose();
+            if (ImGui::MenuItem("Exit"))
+                ToolbarFileExit();
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Edit")) {
+            if (ImGui::MenuItem("Settings...")) {
+            }
+
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Help")) {
+            if (ImGui::MenuItem("About"))
+                ToolbarHelpAbout();
+
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMenuBar();
+    }
+
+    ImGui::End();
+}
+
 int main(int argc, char *argv[]) {
     (void)argc;
     (void)argv;
@@ -99,6 +165,8 @@ int main(int argc, char *argv[]) {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
+
+        DrawMainWindow();
 
         // UI Window
         ImGui::Begin("Audio Control");

@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 include(FetchContent)
 
 project(girth)
@@ -44,7 +46,7 @@ set_target_properties(girth PROPERTIES CXX_EXTENSIONS OFF)
 
 target_link_libraries(girth PRIVATE
     SDL3::SDL3
-    OpenGL::GL 
+    OpenGL::GL
     portaudio_static
 )
 
