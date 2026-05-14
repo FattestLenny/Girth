@@ -8,9 +8,12 @@ find_package(OpenGL REQUIRED)
 
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
-
 FetchContent_Declare(SDL3 GIT_REPOSITORY https://github.com/libsdl-org/SDL.git GIT_TAG release-3.4.8)
+
 FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG v1.92.8)
+
+set(PA_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(PA_BUILD_STATIC ON CACHE BOOL "" FORCE)
 FetchContent_Declare(portaudio GIT_REPOSITORY https://github.com/PortAudio/portaudio.git GIT_TAG v19.7.0)
 
 FetchContent_MakeAvailable(SDL3 imgui portaudio)
@@ -42,7 +45,7 @@ set_target_properties(girth PROPERTIES CXX_EXTENSIONS OFF)
 target_link_libraries(girth PRIVATE
     SDL3::SDL3
     OpenGL::GL 
-    portaudio
+    portaudio_static
 )
 
 target_compile_options(girth PRIVATE
