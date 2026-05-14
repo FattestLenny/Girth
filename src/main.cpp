@@ -5,54 +5,42 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
 #include <portaudio.h>
-#include <cmath>
-#include <vector>
+#include "vst/vst_host.hpp"
+#include "ui/piano_roll.hpp"
+#include <cstring>
 #include <print>
 
-// --- Audio Logic ---
-struct AudioData {
-    float phase     = 0.0f;
-    float frequency = 440.0f;
-    bool playing    = false;
+// ---------------------------------------------------------------------------
+// Audio
+// ---------------------------------------------------------------------------
+struct AppAudio {
+    VstHost *host{nullptr};
+    float left[2048]{};
+    float right[2048]{};
 };
 
-// PortAudio Callback: Generates a simple sine wave
-static int paCallback(const void *inputBuffer, void *outputBuffer,
-                      unsigned long framesPerBuffer,
-                      const PaStreamCallbackTimeInfo *timeInfo,
-                      PaStreamCallbackFlags statusFlags, void *userData) {
-    (void)inputBuffer;
-    (void)timeInfo;
-    (void)statusFlags;
-
-    AudioData *data = (AudioData *)userData;
-    float *out      = (float *)outputBuffer;
-
-    for (unsigned int i = 0; i < framesPerBuffer; i++) {
-        if (data->playing) {
-            *out++ = 0.2f * sinf(data->phase); // Left channel
-            *out++ = 0.2f * sinf(data->phase); // Right channel
-            data->phase += (2.0f * 3.14159f * data->frequency) / 44100.0f;
-            if (data->phase > 2.0f * 3.14159f)
-                data->phase -= 2.0f * 3.14159f;
-        } else {
-            *out++ = 0.0f;
-            *out++ = 0.0f;
-        }
+static int paCallback(const void * /*in*/, void *out, unsigned long frames,
+                      const PaStreamCallbackTimeInfo * /*ti*/,
+                      PaStreamCallbackFlags /*fl*/, void *userData) {
+    auto *app  = static_cast<AppAudio *>(userData);
+    float *buf = static_cast<float *>(out);
+    app->host->process(app->left, app->right, static_cast<int>(frames));
+    for (unsigned long i = 0; i < frames; ++i) {
+        *buf++ = app->left[i];
+        *buf++ = app->right[i];
     }
     return paContinue;
 }
+
+// ---------------------------------------------------------------------------
 
 int main(int argc, char *argv[]) {
     (void)argc;
     (void)argv;
 
-    std::println("Initializing Girth...");
-    SDL_Log("hi\n");
-    printf("hii\n");
-
     if (!SDL_Init(SDL_INIT_VIDEO)) {
-        std::println("Failed to init SDL3.");
+        std::println("SDL init failed");
+        return 1;
     }
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -60,32 +48,47 @@ int main(int argc, char *argv[]) {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
                         SDL_GL_CONTEXT_PROFILE_CORE);
 
-    SDL_Window *window =
-        SDL_CreateWindow("Girth", 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *window = SDL_CreateWindow(
+        "Girth", 1100, 520, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (!window) {
-        std::println("Failed to create SDL3 window.");
+        std::println("Window creation failed");
+        return 1;
     }
 
-    SDL_GLContext gl_context = SDL_GL_CreateContext(window);
-    SDL_GL_MakeCurrent(window, gl_context);
+    SDL_GLContext gl = SDL_GL_CreateContext(window);
+    SDL_GL_MakeCurrent(window, gl);
+    SDL_GL_SetSwapInterval(1);
 
-    // 3. Initialize PortAudio
-    AudioData audioData;
+    VstHost vstHost;
+    PianoRoll pianoRoll;
+
+    AppAudio audio;
+    audio.host = &vstHost;
+
     Pa_Initialize();
-    PaStream *stream;
+    PaStream *stream = nullptr;
     Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, 44100, 256, paCallback,
-                         &audioData);
+                         &audio);
     Pa_StartStream(stream);
 
-    // 4. Setup Dear ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    ImGui::StyleColorsDark();
+    ImGui_ImplSDL3_InitForOpenGL(window, gl);
     ImGui_ImplOpenGL3_Init("#version 150");
 
-    // Main Loop
+    // Tweak style for a dark DAW feel
+    ImGuiStyle &s               = ImGui::GetStyle();
+    s.WindowRounding            = 0.0f;
+    s.FrameRounding             = 3.0f;
+    s.ItemSpacing               = {6, 4};
+    s.Colors[ImGuiCol_WindowBg] = {0.10f, 0.10f, 0.11f, 1.0f};
+
+    static char pluginPath[512] =
+        "C:\\Program Files\\Common Files\\VST3\\Serum2.vst3";
+    static std::string loadError;
+
     bool done = false;
     while (!done) {
         SDL_Event event;
@@ -95,38 +98,132 @@ int main(int argc, char *argv[]) {
                 done = true;
         }
 
-        // Start Frame
+        double nowMs = static_cast<double>(SDL_GetTicks());
+
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
-        // UI Window
-        ImGui::Begin("Audio Control");
-        ImGui::Checkbox("Play Sine Wave", &audioData.playing);
-        ImGui::SliderFloat("Frequency", &audioData.frequency, 100.0f, 1000.0f);
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                    1000.0f / io.Framerate, io.Framerate);
+        ImGuiIO &io = ImGui::GetIO();
+        ImGui::SetNextWindowPos({0, 0});
+        ImGui::SetNextWindowSize(io.DisplaySize);
+        ImGui::Begin("##main", nullptr,
+                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                         ImGuiWindowFlags_NoMove |
+                         ImGuiWindowFlags_NoCollapse |
+                         ImGuiWindowFlags_NoScrollbar);
+
+        // ── Top bar: plugin + transport ───────────────────────────────────
+        // Plugin path + load/unload
+        ImGui::SetNextItemWidth(io.DisplaySize.x - 430.0f);
+        ImGui::InputText("##path", pluginPath, sizeof(pluginPath));
+        ImGui::SameLine();
+
+        if (ImGui::Button("Load")) {
+            loadError.clear();
+            vstHost.closeEditor();
+            if (!vstHost.load(pluginPath, 44100.0, 256))
+                loadError = "Load failed.";
+            else
+                vstHost.openEditor();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Unload")) {
+            vstHost.closeEditor();
+            vstHost.unload();
+            loadError.clear();
+        }
+
+        ImGui::SameLine(0, 12);
+
+        // Plugin status
+        if (!loadError.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, {1, 0.3f, 0.3f, 1});
+            ImGui::TextUnformatted(loadError.c_str());
+            ImGui::PopStyleColor();
+        } else if (vstHost.isLoaded()) {
+            ImGui::TextColored({0.4f, 1, 0.4f, 1}, "%s",
+                               vstHost.getPluginName().c_str());
+            ImGui::SameLine();
+            if (vstHost.isEditorOpen()) {
+                if (ImGui::SmallButton("Hide UI"))
+                    vstHost.closeEditor();
+            } else {
+                if (ImGui::SmallButton("Show UI"))
+                    vstHost.openEditor();
+            }
+        } else {
+            ImGui::TextDisabled("No plugin");
+        }
+
+        ImGui::SameLine(0, 20);
+        ImGui::Separator();
+        ImGui::SameLine(0, 10);
+
+        // Transport
+        bool playing = pianoRoll.isPlaying();
+        if (playing) {
+            if (ImGui::Button("  ||  "))
+                pianoRoll.stop(&vstHost);
+        } else {
+            if (ImGui::Button("  >   "))
+                pianoRoll.play();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("<<")) {
+            pianoRoll.stop(&vstHost);
+            pianoRoll.setPlayheadBeat(0.0);
+        }
+        ImGui::SameLine();
+
+        // BPM
+        ImGui::SetNextItemWidth(70);
+        float bpmF = static_cast<float>(pianoRoll.bpm);
+        if (ImGui::DragFloat("BPM", &bpmF, 0.5f, 20.0f, 300.0f, "%.1f"))
+            pianoRoll.bpm = static_cast<double>(bpmF);
+        ImGui::SameLine();
+
+        // Loop end
+        ImGui::SetNextItemWidth(60);
+        ImGui::DragFloat("Loop", &pianoRoll.loopEnd, 0.25f, 1.0f, 128.0f,
+                         "%.0f");
+        ImGui::SameLine();
+        ImGui::Checkbox("##loop", &pianoRoll.looping);
+
+        ImGui::SameLine(0, 12);
+        ImGui::TextDisabled(
+            "LMB=place  RMB=delete  MMB/drag=pan  Ctrl+scroll=hzoom  "
+            "Shift+scroll=hscroll  Alt+scroll=vzoom");
+
+        ImGui::Separator();
+
+        // ── Piano roll fills remaining space ─────────────────────────────
+        ImVec2 avail = ImGui::GetContentRegionAvail();
+        pianoRoll.draw(avail, vstHost, nowMs);
+
         ImGui::End();
 
-        // Rendering
         ImGui::Render();
-        glViewport(0, 0, 1280, 720);
-        glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+        int w, h;
+        SDL_GetWindowSize(window, &w, &h);
+        glViewport(0, 0, w, h);
+        glClearColor(0.08f, 0.08f, 0.09f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
     }
 
-    // Cleanup
+    pianoRoll.stop(&vstHost);
+    vstHost.closeEditor();
+    vstHost.unload();
     Pa_StopStream(stream);
     Pa_CloseStream(stream);
     Pa_Terminate();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
-    SDL_GL_DestroyContext(gl_context);
+    SDL_GL_DestroyContext(gl);
     SDL_DestroyWindow(window);
     SDL_Quit();
-
     return 0;
 }

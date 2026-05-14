@@ -1,5 +1,7 @@
 _deps
 build/
+.claude
+imgui.ini
 *.cmake
 CMakeFiles
 CMakeCache.txt
