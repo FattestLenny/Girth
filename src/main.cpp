@@ -11,30 +11,30 @@
 
 // --- Audio Logic ---
 struct AudioData {
-    float phase = 0.0f;
+    float phase     = 0.0f;
     float frequency = 440.0f;
-    bool playing = false;
+    bool playing    = false;
 };
 
 // PortAudio Callback: Generates a simple sine wave
-static int paCallback(const void* inputBuffer, void* outputBuffer,
+static int paCallback(const void *inputBuffer, void *outputBuffer,
                       unsigned long framesPerBuffer,
-                      const PaStreamCallbackTimeInfo* timeInfo,
-                      PaStreamCallbackFlags statusFlags,
-                      void* userData) {
+                      const PaStreamCallbackTimeInfo *timeInfo,
+                      PaStreamCallbackFlags statusFlags, void *userData) {
     (void)inputBuffer;
     (void)timeInfo;
     (void)statusFlags;
 
-    AudioData* data = (AudioData*)userData;
-    float* out = (float*)outputBuffer;
+    AudioData *data = (AudioData *)userData;
+    float *out      = (float *)outputBuffer;
 
     for (unsigned int i = 0; i < framesPerBuffer; i++) {
         if (data->playing) {
             *out++ = 0.2f * sinf(data->phase); // Left channel
             *out++ = 0.2f * sinf(data->phase); // Right channel
             data->phase += (2.0f * 3.14159f * data->frequency) / 44100.0f;
-            if (data->phase > 2.0f * 3.14159f) data->phase -= 2.0f * 3.14159f;
+            if (data->phase > 2.0f * 3.14159f)
+                data->phase -= 2.0f * 3.14159f;
         } else {
             *out++ = 0.0f;
             *out++ = 0.0f;
@@ -43,7 +43,7 @@ static int paCallback(const void* inputBuffer, void* outputBuffer,
     return paContinue;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     (void)argc;
     (void)argv;
 
@@ -57,9 +57,11 @@ int main(int argc, char* argv[]) {
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+                        SDL_GL_CONTEXT_PROFILE_CORE);
 
-    SDL_Window* window = SDL_CreateWindow("Girth", 1280, 720, SDL_WINDOW_OPENGL);
+    SDL_Window *window =
+        SDL_CreateWindow("Girth", 1280, 720, SDL_WINDOW_OPENGL);
     if (!window) {
         std::println("Failed to create SDL3 window.");
     }
@@ -70,14 +72,16 @@ int main(int argc, char* argv[]) {
     // 3. Initialize PortAudio
     AudioData audioData;
     Pa_Initialize();
-    PaStream* stream;
-    Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, 44100, 256, paCallback, &audioData);
+    PaStream *stream;
+    Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, 44100, 256, paCallback,
+                         &audioData);
     Pa_StartStream(stream);
 
     // 4. Setup Dear ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO &io = ImGui::GetIO();
+    (void)io;
     ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init("#version 150");
 
@@ -87,7 +91,8 @@ int main(int argc, char* argv[]) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL3_ProcessEvent(&event);
-            if (event.type == SDL_EVENT_QUIT) done = true;
+            if (event.type == SDL_EVENT_QUIT)
+                done = true;
         }
 
         // Start Frame
@@ -99,7 +104,8 @@ int main(int argc, char* argv[]) {
         ImGui::Begin("Audio Control");
         ImGui::Checkbox("Play Sine Wave", &audioData.playing);
         ImGui::SliderFloat("Frequency", &audioData.frequency, 100.0f, 1000.0f);
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+                    1000.0f / io.Framerate, io.Framerate);
         ImGui::End();
 
         // Rendering
