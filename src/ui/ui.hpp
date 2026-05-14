@@ -49,6 +49,8 @@ public:
     double paddingBottom;
     double childGap;
 
+    void addChild(UINode node);
+
 private:
     UINode* parent;
     // TODO: Turn this into vector<UINode*> if needed.

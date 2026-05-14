@@ -1,4 +1,5 @@
 #include <SDL3/SDL.h>
+<<<<<<< HEAD
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_opengl.h>
 #include "imgui.h"
@@ -41,6 +42,44 @@ static int paCallback(const void* inputBuffer, void* outputBuffer,
         }
     }
     return paContinue;
+=======
+#include <iostream>
+
+int main() {
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+        std::cout << "Failed to initialize SDL\n";
+        std::exit(1);
+    }
+
+    SDL_Window* sdlWindow;
+    SDL_Renderer* sdlRenderer;
+    bool shouldQuit = false;
+
+    SDL_CreateWindowAndRenderer("Girth", 800, 600, SDL_WINDOW_RESIZABLE, &sdlWindow, &sdlRenderer);
+
+    while (!shouldQuit) {
+        SDL_Event e;
+
+        while (SDL_PollEvent(&e)) {
+            switch (e.type) {
+                case SDL_EVENT_QUIT: {
+                    shouldQuit = true;
+                } break;
+            }
+        }
+
+        SDL_SetRenderDrawColor(sdlRenderer, 10, 10, 10, 255);
+        SDL_RenderClear(sdlRenderer);
+
+        SDL_RenderPresent(sdlRenderer);
+
+        // This avoids the CPU overusage.
+        // This will be discarded once we implement drawing by event and not by loop.
+        SDL_Delay(1000 / 60);
+    }
+
+    SDL_Quit();
+>>>>>>> 7695fcad269805f0f57a6428f082c6bbfd5f6608
 }
 
 int main(int argc, char* argv[]) {
